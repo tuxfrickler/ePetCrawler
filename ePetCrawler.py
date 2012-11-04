@@ -1,7 +1,7 @@
 __author___ = 'Marco Endress'
 __version__ = '0.2'
 __date__    = '11/04/2012'
-__progname__= 'ePetGrabber'
+__progname__= 'ePetCrawler'
 
 import sys, os, time
 import re
@@ -9,12 +9,11 @@ import mechanize
 import Queue
 from BeautifulSoup import BeautifulSoup
 import threading
-"""
+
 epetitionAccount = { 
         'u'  : 'yourUsername',
         'pw' : 'yourPassword'
     }
-    """
 
 ########################################################################
 class Args:
@@ -68,11 +67,11 @@ class SideDownloader(threading.Thread):
             print ex
             
 ########################################################################
-class EpetitionsGrabber:
+class EpetitionsCrawler:
     """ grab epetition data """
     #----------------------------------------------------------------------
     def __init__(self, petId):
-        """ init EpetitionsGrabber """
+        """ init EpetitionsCrawler """
         self._petId = petId
         self._br = None
         self._host = 'https://epetitionen.bundestag.de'
@@ -218,8 +217,8 @@ def main():
     if len(sys.argv) != 3:
         a.usage()
         
-    petGrabber = EpetitionsGrabber(sys.argv[2])
-    petGrabber.grabpetID()
+    petCrawler = EpetitionsCrawler(sys.argv[2])
+    petCrawler.grabpetID()
 
 if __name__ == "__main__":
     main()
