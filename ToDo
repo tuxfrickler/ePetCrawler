@@ -1,0 +1,9 @@
+ToDO: @11/05/2012
+++++++++++++++++++++++
+- seperate def grabpetID
+- write output class
+- add argument parser (generators, etc.)
+- write nice html output
+- fix encoding style
+- check pattern
+- clean codebase

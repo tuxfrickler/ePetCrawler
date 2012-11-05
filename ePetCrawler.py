@@ -1,6 +1,8 @@
+#!/usr/bin/python
+
 __author___ = 'Marco Endress'
-__version__ = '0.2'
-__date__    = '11/04/2012'
+__version__ = '0.25'
+__date__    = '11/05/2012'
 __progname__= 'ePetCrawler'
 
 import sys, os, time
@@ -11,9 +13,12 @@ from BeautifulSoup import BeautifulSoup
 import threading
 
 epetitionAccount = { 
-        'u'  : 'yourUsername',
-        'pw' : 'yourPassword'
+        'u'  : 'username',
+        'pw' : 'password'
     }
+    
+num_threads = 15
+files_loaded = 0
 
 ########################################################################
 class Args:
@@ -34,9 +39,38 @@ class Args:
         sys.exit(1)
         
 ########################################################################
+class ProgressListener(threading.Thread):
+    def __init__(self, msg, sides):
+        threading.Thread.__init__(self)
+        self._msg = msg
+        self.event = threading.Event()
+        self._sides = sides
+        
+    def __enter__(self):
+        self.start()
+        
+    def __exit__(self, ex_type, ex_value, ex_traceback):
+        self.event.set()
+        self.join()
+        
+    def run(self):
+        """"""
+        sys.stdout.write("+ Download in progress:               +\n")
+        while True:
+            if files_loaded == self._sides:
+                sys.stdout.write("\r+ % 3d %s                    +" % (files_loaded, self._msg))
+                sys.stdout.write("\n---------------------------------------\n")
+                sys.stdout.flush()
+                return
+            else:
+                sys.stdout.write("\r+ % 3d %s                    +" % (files_loaded, self._msg))
+                sys.stdout.flush()
+                self.event.wait(0.01)
+            
+########################################################################
 class SideDownloader(threading.Thread):
     """ Threaded Side Downloader """
- 
+    
     #----------------------------------------------------------------------
     def __init__(self, queue, cookie):
         """ init Side Downloader """
@@ -44,6 +78,7 @@ class SideDownloader(threading.Thread):
         self.queue = queue
         self.threadBrowser = mechanize.Browser()
         self.threadBrowser._ua_handlers['_cookies'].cookiejar = cookie
+        self.inc_lock = threading.Lock() 
  
     #----------------------------------------------------------------------
     def run(self):
@@ -62,6 +97,8 @@ class SideDownloader(threading.Thread):
             fname = os.path.basename(url)
             with open(fname, "wb") as f:
                 f.write(html)
+            global files_loaded
+            files_loaded += 1
             
         except Exception, ex:
             print ex
@@ -94,20 +131,25 @@ class EpetitionsCrawler:
         
         if matches == []:
             subscrCount = -1
-            #raise
+            #raise Error
         else:
             subscrCount = matches[0]
             pageCounter = self.calcPages(subscrCount)
         
-        self.printMsg("Petition %s:\n%s subscribers(s)\n-> %i sides to parsing " % (self._petId, subscrCount , pageCounter), 0)
-        start_timer = time.time()
+        self.printMsg("Petition %s:\n%s subscribers(s)\n-> %i sides to parsing " 
+                              % (self._petId, subscrCount , pageCounter), 0)
         
+        start_timer = time.time()
         queue = Queue.Queue()
         fileList = []
         cookie = self._br._ua_handlers['_cookies'].cookiejar
+        
+        threadListener = ProgressListener("files loaded", pageCounter)
+        threadListener.setDaemon(True)
+        threadListener.start()
  
         # create a thread pool and give them a queue
-        for i in xrange(15):
+        for i in xrange(num_threads):
             threadLocal = SideDownloader(queue, cookie)
             threadLocal.setDaemon(True)
             threadLocal.start()
@@ -118,6 +160,9 @@ class EpetitionsCrawler:
             fileList.append(url)
        
         queue.join()
+        threadListener.join()
+        
+        self.printMsg("write %s.html" % (self._petId), 0)
         self.writeOut(fileList)
         latency = time.time() - start_timer
         self.printMsg("time left: %s" % str(latency), 0)
@@ -155,7 +200,6 @@ class EpetitionsCrawler:
                 self.printMsg("login okay", 0)
             
         except Exception, ex:
-            #print "\tError: %s" % ex
             self.printMsg(str(ex), 0)
             sys.exit(1)
       
@@ -171,11 +215,12 @@ class EpetitionsCrawler:
         
     #----------------------------------------------------------------------
     def writeOut(self, fileList):
-        """ parse html files and write output file """
+        """ parse html files and write output to file """
         table = ''
         for item in fileList:
             fhandler = open(os.path.basename(item), "r")
             raw_html = fhandler.read()
+            os.remove(fhandler.name)
             soup = BeautifulSoup(''.join(raw_html))
             table += str(soup.find('table', id="subscriber"))
       
@@ -189,23 +234,27 @@ class EpetitionsCrawler:
         try:
             border = "+++++++++++++++++++++++++++++++++++++++"
             if outBorder == 1:
-                print border
+                sys.stdout.write("%s \n" % border)
+                sys.stdout.flush()
             
             if len(msg) <= len(border):
                 borderRight = "+"
                 borderRight = borderRight.rjust(len(border) - len(msg) - 2)
-                print "+ %s"  % (msg + borderRight)
+                sys.stdout.write("+ %s \n" % (msg + borderRight))
+                sys.stdout.flush()
             else:
                 newlines = msg.count('\n')
                 for i in xrange(newlines + 1):
                       borderRight = "+"
                       borderRight = borderRight.rjust(len(border) - len(msg.split('\n')[i]) - 2)
-                      print "+ %s"  % (msg.split('\n')[i] + borderRight)
+                      sys.stdout.write("+ %s \n" % (msg.split('\n')[i] + borderRight))
+                      sys.stdout.flush()
                 
             if outBorder == 2:
-                print border
+                sys.stdout.write("%s \n" % border)
             else:
-                print "---------------------------------------"
+                sys.stdout.write("---------------------------------------\n")
+            sys.stdout.flush()
                 
         except Exception, ex:
             print ex
