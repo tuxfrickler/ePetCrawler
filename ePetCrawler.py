@@ -1,8 +1,8 @@
 #!/usr/bin/python
 
 __author___ = 'Marco Endress'
-__version__ = '0.25'
-__date__    = '11/05/2012'
+__version__ = '0.26'
+__date__    = '12/10/2012'
 __progname__= 'ePetCrawler'
 
 import sys, os, time
